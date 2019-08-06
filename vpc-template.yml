@@ -19,9 +19,6 @@ Resources:
       AvailabilityZone: us-east-1a
       CidrBlock: 10.0.0.0/24
       MapPublicIpOnLaunch: true
-      Tags:
-        - Key: Name
-          Value: ecs-public-subnet-az1
       VpcId: !Ref VPC
   PublicSubnetAZ2:
     Type: "AWS::EC2::Subnet"
@@ -29,9 +26,6 @@ Resources:
       AvailabilityZone: us-east-1b
       CidrBlock: 10.0.1.0/24
       MapPublicIpOnLaunch: true
-      Tags:
-        - Key: Name
-          Value: ecs-public-subnet-az2
       VpcId: !Ref VPC
 # Private Subnets
   PrivateSubnetAZ1:
@@ -39,18 +33,12 @@ Resources:
     Properties:
       AvailabilityZone: us-east-1a
       CidrBlock: 10.0.2.0/24
-      Tags:
-        - Key: Name
-          Value: ecs-private-subnet-az1
       VpcId: !Ref VPC
   PrivateSubnetAZ2:
     Type: "AWS::EC2::Subnet"
     Properties:
       AvailabilityZone: us-east-1b
       CidrBlock: 10.0.3.0/24
-      Tags:
-        - Key: Name
-          Value: ecs-private-subnet-az2
       VpcId: !Ref VPC
 # Public Networking settings
   InternetGateway:
@@ -67,9 +55,6 @@ Resources:
   PublicRouteTable:
     Type: "AWS::EC2::RouteTable"
     Properties:
-      Tags:
-        - Key: Name
-          Value: ecs-public-route-table
       VpcId: !Ref VPC
   PublicRoute:
     Type: "AWS::EC2::Route"
@@ -77,6 +62,8 @@ Resources:
       DestinationCidrBlock: 0.0.0.0/0
       GatewayId: !Ref InternetGateway
       RouteTableId: !Ref PublicRouteTable
+    DependsOn: 
+      - GatewayAttachement
   PublicSubnet1RouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
@@ -86,38 +73,33 @@ Resources:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       SubnetId: !Ref PublicSubnetAZ2
-      RouteTableId: !Ref 
+      RouteTableId: !Ref PublicRouteTable
 # Private Subnets settings
   EIP1:
     Type: "AWS::EC2::EIP"
     Properties:
       Domain: vpc
+    DependsOn: 
+      - GatewayAttachement
   EIP2:
     Type: "AWS::EC2::EIP"
     Properties:
       Domain: vpc
+    DependsOn: 
+      - GatewayAttachement
   NatGateway1:
     Type: "AWS::EC2::NatGateway"
     Properties:
       AllocationId: !GetAtt EIP1.AllocationId
       SubnetId: !Ref PublicSubnetAZ1
-      Tags:
-        - Key: Name
-          Value: ecs-nat-gateway-1
   NatGateway2:
     Type: "AWS::EC2::NatGateway"
     Properties:
       AllocationId: !GetAtt EIP2.AllocationId
       SubnetId: !Ref PublicSubnetAZ2
-      Tags:
-        - Key: Name
-          Value: ecs-nat-gateway-2
   PrivateRouteTableAZ1:
     Type: "AWS::EC2::RouteTable"
     Properties:
-      Tags:
-        - Key: Name
-          Value: ecs-private-route-table-az1
       VpcId: !Ref VPC
   PrivateRouteOne:
     Type: AWS::EC2::Route
@@ -133,9 +115,6 @@ Resources:
   PrivateRouteTableAZ2:
     Type: "AWS::EC2::RouteTable"
     Properties:
-      Tags:
-        - Key: Name
-          Value: ecs-private-route-table-az2
       VpcId: !Ref VPC
   PrivateRouteTwo:
     Type: AWS::EC2::Route
@@ -151,11 +130,6 @@ Resources:
 # ECS
   GeneralCluster:
     Type: "AWS::ECS::Cluster"
-    Properties:
-      ClusterName: String
-      Tags:
-        - Key: Name
-          Value: general-cluster
 # ECS Security Groups
   FargateContainerSecurityGroup:
     Type: "AWS::EC2::SecurityGroup"
@@ -204,6 +178,31 @@ Resources:
       Subnets:
         - !Ref PublicSubnetAZ1
         - !Ref PublicSubnetAZ2
+# Public DUMMY Target Group
+  DummyTargetGroupPublic:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 6
+      HealthCheckPath: /
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      Name: !Join ['-', [!Ref 'AWS::StackName', 'drop-1']]
+      Port: 80
+      Protocol: HTTP
+      UnhealthyThresholdCount: 2
+      VpcId: !Ref VPC
+  PublicLoadBalancerListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    DependsOn:
+      - PublicLoadBalancer
+    Properties:
+      DefaultActions:
+        - TargetGroupArn: !Ref DummyTargetGroupPublic
+          Type: forward
+      LoadBalancerArn: !Ref PublicLoadBalancer
+      Port: 80
+      Protocol: HTTP
 # Private Load Balancer
   PrivateLoadBalancerSG:
     Type: "AWS::EC2::SecurityGroup"
@@ -214,9 +213,9 @@ Resources:
     Type: "AWS::EC2::SecurityGroupIngress"
     Properties:
       Description: Only accept traffic from a container in the fargate container security group
-      GroupId: !Ref 'PrivateLoadBalancerSG'
+      GroupId: !Ref PrivateLoadBalancerSG
       IpProtocol: -1
-      SourceSecurityGroupId: !Ref 'FargateContainerSecurityGroup'
+      SourceSecurityGroupId: !Ref FargateContainerSecurityGroup
   PrivateLoadBalancer:
     Type: "AWS::ElasticLoadBalancingV2::LoadBalancer"
     Properties:
@@ -227,8 +226,33 @@ Resources:
       SecurityGroups:
         - !Ref PrivateLoadBalancerSG
       Subnets:
-        - PrivateSubnetAZ1
-        - PrivateSubnetAZ2
+        - !Ref PrivateSubnetAZ1
+        - !Ref PrivateSubnetAZ2
+# Private DUMMY Target Group
+  DummyTargetGroupPrivate:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 6
+      HealthCheckPath: /
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      Name: !Join ['-', [!Ref 'AWS::StackName', 'drop-2']]
+      Port: 80
+      Protocol: HTTP
+      UnhealthyThresholdCount: 2
+      VpcId: !Ref 'VPC'
+  PrivateLoadBalancerListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    DependsOn:
+      - PrivateLoadBalancer
+    Properties:
+      DefaultActions:
+        - TargetGroupArn: !Ref DummyTargetGroupPrivate
+          Type: forward
+      LoadBalancerArn: !Ref PrivateLoadBalancer
+      Port: 80
+      Protocol: HTTP
 # IAM Roles
   ECSRole:
     Type: AWS::IAM::Role
@@ -237,8 +261,10 @@ Resources:
         Statement:
         - Effect: Allow
           Principal:
-            Service: [ecs.amazonaws.com]
-          Action: ['sts:AssumeRole']
+            Service:
+              - ecs.amazonaws.com
+          Action:
+            - 'sts:AssumeRole'
       Path: /
       Policies:
       - PolicyName: ecs-service
@@ -266,8 +292,10 @@ Resources:
         Statement:
         - Effect: Allow
           Principal:
-            Service: [ecs-tasks.amazonaws.com]
-          Action: ['sts:AssumeRole']
+            Service:
+              - ecs-tasks.amazonaws.com
+          Action:
+            - 'sts:AssumeRole'
       Path: /
       Policies:
         - PolicyName: AmazonECSTaskExecutionRolePolicy
@@ -283,6 +311,11 @@ Resources:
                 - 'logs:PutLogEvents'
               Resource: '*'
 Outputs:
+  ClusterName:
+    Description: The name of the ECS cluster
+    Value: !Ref GeneralCluster
+    Export:
+      Name: !Join [ ':', [ !Ref 'AWS::StackName', 'ClusterName' ] ]
   InternalUrl:
     Description: The url of the internal load balancer
     Value: !Join ['', ['http://', !GetAtt 'PrivateLoadBalancer.DNSName']]
@@ -293,3 +326,53 @@ Outputs:
     Value: !Join ['', ['http://', !GetAtt 'PublicLoadBalancer.DNSName']]
     Export:
       Name: !Join [ ':', [ !Ref 'AWS::StackName', 'ExternalUrl' ] ]
+  ECSRole:
+    Description: The ARN of the ECS role
+    Value: !GetAtt ECSRole.Arn
+    Export:
+      Name: !Join [ ':', [ !Ref 'AWS::StackName', 'ECSRole' ] ]
+  ECSTaskExecutionRole:
+    Description: The ARN of the ECS role
+    Value: !GetAtt ECSTaskExecutionRole.Arn
+    Export:
+      Name: !Join [ ':', [ !Ref 'AWS::StackName', 'ECSTaskExecutionRole' ] ]
+  PublicListener:
+    Description: The ARN of the public load balancer's Listener
+    Value: !Ref PublicLoadBalancerListener
+    Export:
+      Name: !Join [ ':', [ !Ref 'AWS::StackName', 'PublicListener' ] ]
+  PrivateListener:
+    Description: The ARN of the public load balancer's Listener
+    Value: !Ref PrivateLoadBalancerListener
+    Export:
+      Name: !Join [ ':', [ !Ref 'AWS::StackName', 'PrivateListener' ] ]
+  VPCId:
+    Description: The ID of the VPC that this stack is deployed in
+    Value: !Ref VPC
+    Export:
+      Name: !Join [ ':', [ !Ref 'AWS::StackName', 'VPCId' ] ]
+  PublicSubnetOne:
+    Description: Public subnet one
+    Value: !Ref PublicSubnetAZ1
+    Export:
+      Name: !Join [ ':', [ !Ref 'AWS::StackName', 'PublicSubnetOne' ] ]
+  PublicSubnetTwo:
+    Description: Public subnet two
+    Value: !Ref PublicSubnetAZ2
+    Export:
+      Name: !Join [ ':', [ !Ref 'AWS::StackName', 'PublicSubnetTwo' ] ]
+  PrivateSubnetOne:
+    Description: Private subnet one
+    Value: !Ref PrivateSubnetAZ1
+    Export:
+      Name: !Join [ ':', [ !Ref 'AWS::StackName', 'PrivateSubnetOne' ] ]
+  PrivateSubnetTwo:
+    Description: Private subnet two
+    Value: !Ref PrivateSubnetAZ2
+    Export:
+      Name: !Join [ ':', [ !Ref 'AWS::StackName', 'PrivateSubnetTwo' ] ]
+  FargateContainerSecurityGroup:
+    Description: A security group used to allow Fargate containers to receive traffic
+    Value: !Ref FargateContainerSecurityGroup
+    Export:
+      Name: !Join [ ':', [ !Ref 'AWS::StackName', 'FargateContainerSecurityGroup' ] ]
