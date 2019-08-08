@@ -1,0 +1,16 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Main template
+Resources:
+  NetworkingStack:
+    Type: "AWS::CloudFormation::Stack"
+    Properties:
+      TemplateURL: ./vpc-template.yml
+  ServiceStack1:
+    Type: "AWS::CloudFormation::Stack"
+    Properties:
+      Parameters:
+        StackName:
+          !GetAtt NetworkingStack.Outputs.StackName
+      TemplateURL: ./service-template.yml
+    DependsOn:
+      - NetworkingStack

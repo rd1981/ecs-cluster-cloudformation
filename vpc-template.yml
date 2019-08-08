@@ -20,6 +20,9 @@ Resources:
       CidrBlock: 10.0.0.0/24
       MapPublicIpOnLaunch: true
       VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: ecs-public-subnet-1
   PublicSubnetAZ2:
     Type: "AWS::EC2::Subnet"
     Properties:
@@ -27,6 +30,9 @@ Resources:
       CidrBlock: 10.0.1.0/24
       MapPublicIpOnLaunch: true
       VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: ecs-public-subnet-2
 # Private Subnets
   PrivateSubnetAZ1:
     Type: "AWS::EC2::Subnet"
@@ -34,12 +40,18 @@ Resources:
       AvailabilityZone: us-east-1a
       CidrBlock: 10.0.2.0/24
       VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: ecs-private-subnet-1
   PrivateSubnetAZ2:
     Type: "AWS::EC2::Subnet"
     Properties:
       AvailabilityZone: us-east-1b
       CidrBlock: 10.0.3.0/24
       VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: ecs-private-subnet-2
 # Public Networking settings
   InternetGateway:
     Type: "AWS::EC2::InternetGateway"
@@ -130,6 +142,8 @@ Resources:
 # ECS
   GeneralCluster:
     Type: "AWS::ECS::Cluster"
+    Properties:
+      ClusterName: GeneralCluster
 # ECS Security Groups
   FargateContainerSecurityGroup:
     Type: "AWS::EC2::SecurityGroup"
@@ -187,7 +201,7 @@ Resources:
       HealthCheckProtocol: HTTP
       HealthCheckTimeoutSeconds: 5
       HealthyThresholdCount: 2
-      Name: !Join ['-', [!Ref 'AWS::StackName', 'drop-1']]
+      Name: 'ecs-public-dummy-tg-drop-1'
       Port: 80
       Protocol: HTTP
       UnhealthyThresholdCount: 2
@@ -237,7 +251,7 @@ Resources:
       HealthCheckProtocol: HTTP
       HealthCheckTimeoutSeconds: 5
       HealthyThresholdCount: 2
-      Name: !Join ['-', [!Ref 'AWS::StackName', 'drop-2']]
+      Name: 'ecs-private-dummy-tg-drop-2'
       Port: 80
       Protocol: HTTP
       UnhealthyThresholdCount: 2
@@ -311,6 +325,9 @@ Resources:
                 - 'logs:PutLogEvents'
               Resource: '*'
 Outputs:
+  StackName:
+    Description: The name of the stack
+    Value: !Ref 'AWS::StackName'
   ClusterName:
     Description: The name of the ECS cluster
     Value: !Ref GeneralCluster
