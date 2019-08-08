@@ -11,6 +11,12 @@ Resources:
       Parameters:
         StackName:
           !GetAtt NetworkingStack.Outputs.StackName
+        ServiceName: Sonarqube
+        ImageUrl: sonarqube:latest
+        ContainerPort: 9000
+        ContainerMemory: 2048
+        ContainerCpu: 1024
+        DesiredCount: 1
       TemplateURL: ./service-template.yml
     DependsOn:
       - NetworkingStack
