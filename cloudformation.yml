@@ -5,7 +5,7 @@ Resources:
     Type: "AWS::CloudFormation::Stack"
     Properties:
       TemplateURL: ./vpc-template.yml
-  ServiceStack1:
+  ServiceStack:
     Type: "AWS::CloudFormation::Stack"
     Properties:
       Parameters:
