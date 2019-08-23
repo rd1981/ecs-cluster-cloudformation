@@ -5,18 +5,27 @@ Resources:
     Type: "AWS::CloudFormation::Stack"
     Properties:
       TemplateURL: ./vpc-template.yml
-  ServiceStack:
+  MySqlServiceStack:
     Type: "AWS::CloudFormation::Stack"
     Properties:
       Parameters:
         StackName:
           !GetAtt NetworkingStack.Outputs.StackName
-        ServiceName: Sonarqube
-        ImageUrl: sonarqube:latest
-        ContainerPort: 9000
         ContainerMemory: 2048
         ContainerCpu: 1024
-        DesiredCount: 1
-      TemplateURL: ./service-template.yml
+        DBMasterUserName: sonarqube
+      TemplateURL: ./mysql-template.yml
     DependsOn:
       - NetworkingStack
+  SonarqubeServiceStack:
+    Type: "AWS::CloudFormation::Stack"
+    Properties:
+      Parameters:
+        StackName:
+          !GetAtt NetworkingStack.Outputs.StackName
+        ContainerMemory: 2048
+        ContainerCpu: 1024
+      TemplateURL: ./sonarqube-template.yml
+    DependsOn:
+      - NetworkingStack
+      - MySqlServiceStack

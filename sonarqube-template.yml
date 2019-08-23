@@ -8,16 +8,20 @@ Parameters:
                  to locate and reference resources created by that stack.
   ServiceName:
     Type: String
-    Default: nginx
+    Default: sonarqube
     Description: A name for the service
   ImageUrl:
     Type: String
-    Default: nginx
+    Default: sonarqube
     Description: The url of a docker image that contains the application process that
                  will handle the traffic for this service
-  ContainerPort:
+  ContainerPort1:
     Type: Number
-    Default: 80
+    Default: 9000
+    Description: What port number the application inside the docker container is binding to
+  ContainerPort2:
+    Type: Number
+    Default: 9092
     Description: What port number the application inside the docker container is binding to
   ContainerCpu:
     Type: Number
@@ -41,7 +45,7 @@ Parameters:
                  assigned to different paths on the load balancer.
   DesiredCount:
     Type: Number
-    Default: 2
+    Default: 1
     Description: How many copies of the service task to run
   Role:
     Type: String
@@ -53,8 +57,11 @@ Conditions:
   HasCustomRole: !Not [ !Equals [!Ref 'Role', ''] ]
 
 Resources:
+# Sonarqube
   TaskDefinition:
     Type: AWS::ECS::TaskDefinition
+    DependsOn:
+      - DBSecret
     Properties:
       Family: !Ref ServiceName
       Cpu: !Ref ContainerCpu
@@ -76,10 +83,19 @@ Resources:
           Memory: !Ref ContainerMemory
           Image: !Ref ImageUrl
           PortMappings:
-            - ContainerPort: !Ref ContainerPort
+            - ContainerPort: !Ref ContainerPort1
+            - ContainerPort: !Ref ContainerPort2
+          Environment:
+            - Name: SONARQUBE_JDBC_USERNAME
+              Value: !Join ['', ['{{resolve:secretsmanager:', [ Fn::ImportValue: !Join [':', ['MySqlTemplate', 'DBSecret']]] , ':SecretString:username}}' ]]
+            - Name: SONARQUBE_JDBC_PASSWORD
+              Value: !Join ['', ['{{resolve:secretsmanager:', [ Fn::ImportValue: !Join [':', ['MySqlTemplate', 'DBSecret']]], ':SecretString:password}}' ]]
+            - Name: SONARQUBE_JDBC_URL
+              Value: jdbc:mysql://db-service:3306/sonarqube?useUnicode=true&characterEncoding=utf8&rewriteBatchedStatements=true
   Service:
     Type: AWS::ECS::Service
-    DependsOn: LoadBalancerRule
+    DependsOn:
+      - LoadBalancerRule
     Properties:
       ServiceName: !Ref ServiceName
       Cluster:
@@ -103,7 +119,7 @@ Resources:
       TaskDefinition: !Ref TaskDefinition
       LoadBalancers:
         - ContainerName: !Ref ServiceName
-          ContainerPort: !Ref ContainerPort
+          ContainerPort: !Ref ContainerPort1
           TargetGroupArn: !Ref TargetGroup
   TargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
@@ -115,7 +131,7 @@ Resources:
       HealthyThresholdCount: 2
       TargetType: ip
       Name: !Ref ServiceName
-      Port: !Ref ContainerPort
+      Port: !Ref ContainerPort1
       Protocol: HTTP
       UnhealthyThresholdCount: 2
       VpcId:
