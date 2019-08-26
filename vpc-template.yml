@@ -1,5 +1,9 @@
 AWSTemplateFormatVersion: 2010-09-09
 Description: Networking template for ECS
+Parameters:
+  BastionKeyName:
+    Type: String
+    Description: KeyPair value for the bastion
 Resources:
 # VPC
   VPC:
@@ -324,6 +328,49 @@ Resources:
                 - 'logs:CreateLogStream'
                 - 'logs:PutLogEvents'
               Resource: '*'
+# Bastion
+  BastionLaunchConfiguration:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      AssociatePublicIpAddress: true
+      PlacementTenancy: default
+      InstanceType: t2.micro
+      ImageId: ami-0b898040803850657
+      KeyName: !Ref BastionKeyName
+      SecurityGroups:
+        - !Ref BastionSecurityGroup
+      UserData: !Base64 
+        'Fn::Join':
+          - ''
+          - - |
+              #!/bin/bash
+            - |
+              yum install mysql --assumeyes
+      LaunchConfigurationName: MySqlBastionLaunchConfiguration
+  BastionAutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      MinSize: '1'
+      MaxSize: '2'
+      DesiredCapacity: '1'
+      LaunchConfigurationName: !Ref BastionLaunchConfiguration
+      AutoScalingGroupName: MySqlBastionAutoScalingGroup
+      VPCZoneIdentifier:
+        - !Ref PublicSubnetAZ1
+        - !Ref PublicSubnetAZ2
+  BastionSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: Enables SSH Access to Bastion Hosts
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: ecs-bastion-sg
 Outputs:
   StackName:
     Description: The name of the stack
@@ -393,3 +440,13 @@ Outputs:
     Value: !Ref FargateContainerSecurityGroup
     Export:
       Name: !Join [ ':', [ !Ref 'AWS::StackName', 'FargateContainerSecurityGroup' ] ]
+  FargateContainerSecurityGroupId:
+    Description: A security group used to allow Fargate containers to receive traffic
+    Value: !GetAtt FargateContainerSecurityGroup.GroupId
+    Export:
+      Name: !Join [ ':', [ !Ref 'AWS::StackName', 'FargateContainerSecurityGroupId' ] ]
+  BastionSecurityGroupId:
+    Description: Security group used to allow Bastion to receive traffic
+    Value: !GetAtt BastionSecurityGroup.GroupId
+    Export:
+      Name: !Join [':', [!Ref 'AWS::StackName', 'BastionSecurityGroupId']]

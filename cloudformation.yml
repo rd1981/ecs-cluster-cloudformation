@@ -4,16 +4,16 @@ Resources:
   NetworkingStack:
     Type: "AWS::CloudFormation::Stack"
     Properties:
+      Parameters:
+        BastionKeyName: mmalerba
       TemplateURL: ./vpc-template.yml
   MySqlServiceStack:
     Type: "AWS::CloudFormation::Stack"
     Properties:
       Parameters:
-        StackName:
+        NetworkingStackName:
           !GetAtt NetworkingStack.Outputs.StackName
-        ContainerMemory: 2048
-        ContainerCpu: 1024
-        DBMasterUserName: sonarqube
+        DatabaseName: sonar
       TemplateURL: ./mysql-template.yml
     DependsOn:
       - NetworkingStack
@@ -21,11 +21,16 @@ Resources:
     Type: "AWS::CloudFormation::Stack"
     Properties:
       Parameters:
+        DBSecret:
+          !GetAtt MySqlServiceStack.Outputs.DBSecret
+        RDSEndpointAddress:
+          !GetAtt MySqlServiceStack.Outputs.RDSEndpointAddress
         StackName:
           !GetAtt NetworkingStack.Outputs.StackName
+        ServiceName: sonarqube
+        ImageUrl: sonarqube
         ContainerMemory: 2048
         ContainerCpu: 1024
       TemplateURL: ./sonarqube-template.yml
     DependsOn:
-      - NetworkingStack
       - MySqlServiceStack
