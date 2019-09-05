@@ -42,7 +42,7 @@ Resources:
       DBClusterIdentifier: !Ref DBClusterName
       Engine: aurora
       EngineMode: serverless
-      EngineVersion: '5.6'
+      EngineVersion: '10.7'
       DatabaseName: !Ref DatabaseName
       MasterUsername: !Join ['', ['{{resolve:secretsmanager:', !Ref DBSecret, ':SecretString:username}}' ]]
       MasterUserPassword: !Join ['', ['{{resolve:secretsmanager:', !Ref DBSecret, ':SecretString:password}}' ]]
@@ -61,7 +61,7 @@ Resources:
     Type: AWS::RDS::DBClusterParameterGroup
     Properties:
       Description: AWS Event Driven Architecture Cluster Parameter Group
-      Family: aurora5.6
+      Family: aurora-postgresql10
       Parameters:
         time_zone: 'Brazil/East'
         character_set_database: "utf32"
@@ -79,13 +79,11 @@ Resources:
       SecurityGroupEgress: []
       SecurityGroupIngress:
         - IpProtocol: tcp
-          FromPort: 3306
-          ToPort: 3306
+          FromPort: 5432
+          ToPort: 5432
           SourceSecurityGroupId: 
             Fn::ImportValue: !Join [':', [!Ref 'NetworkingStackName', 'BastionSecurityGroupId']]
-        - IpProtocol: tcp
-          FromPort: 3306
-          ToPort: 3306
+        - IpProtocol: -1
           SourceSecurityGroupId: 
             Fn::ImportValue: !Join [':', [!Ref 'NetworkingStackName', 'FargateContainerSecurityGroupId']]
       VpcId: 

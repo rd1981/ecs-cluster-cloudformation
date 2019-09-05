@@ -154,6 +154,9 @@ Resources:
     Properties:
       GroupDescription: Access to Fargate containers
       VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: ecs-cluster-fargate-container-sg
   EcsSecurityGroupIngressFromPublicALB:
     Type: "AWS::EC2::SecurityGroupIngress"
     Properties:
@@ -184,6 +187,9 @@ Resources:
         - CidrIp: 0.0.0.0/0
           IpProtocol: -1
       VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: ecs-cluster-public-alb-sg
   PublicLoadBalancer:
     Type: "AWS::ElasticLoadBalancingV2::LoadBalancer"
     Properties:
@@ -227,6 +233,9 @@ Resources:
     Properties:
       GroupDescription: Access to the internal load balancer
       VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: ecs-cluster-private-alb-sg
   PrivateLoadBalancerIngressFromECS:
     Type: "AWS::EC2::SecurityGroupIngress"
     Properties:
