@@ -64,7 +64,7 @@ Resources:
       Family: aurora-postgresql10
       Parameters:
         time_zone: 'Brazil/East'
-        character_set_database: "utf32"
+        # character_set_database: utf32
   AuroraServerlessDBSubnetGroup:
     Type: AWS::RDS::DBSubnetGroup
     Properties:

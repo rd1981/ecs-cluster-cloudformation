@@ -355,6 +355,8 @@ Resources:
               #!/bin/bash
             - |
               yum install mysql --assumeyes
+            - |
+              yum install -y postgresql96 &> /dev/null
       LaunchConfigurationName: MySqlBastionLaunchConfiguration
   BastionAutoScalingGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
